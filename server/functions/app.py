@@ -1,45 +1,32 @@
 from fastapi import FastAPI, File, UploadFile
-from fastapi.middleware.cors import CORSMiddleware
-from face_recognition import FaceRecognition 
-from PIL import Image
+from mangum import Mangum
 import numpy as np
 import os
-import train_model
+from PIL import Image
 from datetime import datetime
-# import requests
-# import io
+from face_recognition import FaceRecognition
+import train_model
 
+# Initialize the FastAPI app
 app = FastAPI()
 
-# Cấu hình CORS
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# Initialize the FaceRecognition model
+face_recognition = FaceRecognition(model_path='../face_recognition.py', classes_path="../classes.txt")
 
-# Khởi tạo đối tượng FaceRecognition
-# def download_model_from_github():
-#     url = "https://github.com/luan-thnh/face_recognition/blob/main/server/face_recognition_model.pth"  # Replace with your GitHub raw URL
-#     response = requests.get(url)
+# CORS configuration (if needed)
+@app.middleware("http")
+async def add_cors(request, call_next):
+    response = await call_next(request)
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+    return response
 
-#     if response.status_code == 200:
-#         model_data = io.BytesIO(response.content)
-#         return model_data
-#     else:
-#         raise Exception(f"Failed to download model from GitHub, status code: {response.status_code}")
-    
-# model_path = download_model_from_github()
-face_recognition = FaceRecognition(model_path='./face_recognition_model.pth', classes_path="classes.txt")
-# face_recognition.load(model_path)  # Loading the model
-
-
+# Root endpoint
 @app.get("/")
 async def root():
     return {"message": "Hello, Welcome to Checkify API"}
 
+# Check-in endpoint to upload and predict using the face recognition model
 @app.post("/checkin/")
 async def checkin(file: UploadFile = File(...)):
     try:
@@ -49,7 +36,7 @@ async def checkin(file: UploadFile = File(...)):
         person_id, confidence = face_recognition.predict(image_np)
 
         if confidence > 0.7:
-            dataset_dir = "dataset"
+            dataset_dir = "../dataset"
             person_dir = os.path.join(dataset_dir, str(person_id))
             os.makedirs(person_dir, exist_ok=True)
 
@@ -71,8 +58,12 @@ async def checkin(file: UploadFile = File(...)):
 
     except Exception as e:
         return {"status": "error", "message": str(e)}
-    
+
+# Retrain model endpoint
 @app.post("/retrain/")
 def retrain_model():
     train_model.train_model()
     return {"status": "success", "message": "Model retrained successfully."}
+
+# Wrap the FastAPI app with Mangum to handle AWS Lambda events
+handler = Mangum(app)

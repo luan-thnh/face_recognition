@@ -5,3 +5,4 @@ torchvision
 torch 
 opencv-python 
 pillow
+mangum

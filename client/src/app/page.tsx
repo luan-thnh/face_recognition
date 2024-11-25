@@ -1,10 +1,10 @@
 'use client';
-import CheckIn from './components/CheckIn';
+import TemporaryLink from './components/TemporaryLink';
 
 export default function Home() {
   return (
     <div>
-      <CheckIn />
+      <TemporaryLink />
     </div>
   );
 }

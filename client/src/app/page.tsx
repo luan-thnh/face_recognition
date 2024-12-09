@@ -1,5 +1,11 @@
-import WebcamRecorder from '@/components/WebcamRecorder';
+'use client';
+
+import TemporaryLink from '@/components/TemporaryLink';
 
 export default function Home() {
-  return <WebcamRecorder />;
+  return (
+    <div>
+      <TemporaryLink />
+    </div>
+  );
 }

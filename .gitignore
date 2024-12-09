@@ -1,0 +1,3 @@
+.venv
+server/_pycache
+client/node_modules

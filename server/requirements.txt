@@ -1,0 +1,13 @@
+fastapi 
+uvicorn 
+python-multipart 
+opencv-python 
+pillow
+matplotlib
+opencv-python
+scikit-learn
+seaborn
+tf_keras
+torch
+torchvision
+facenet_pytorch

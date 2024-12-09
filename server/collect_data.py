@@ -1,50 +1,57 @@
 import cv2
-import numpy as np
 import os
-import torch
-import torchvision.transforms as transforms
 from PIL import Image
-from facenet_pytorch import MTCNN
+import numpy as np
 
-def collect_data(name, num_images=100):
-    save_dir = os.path.join('dataset', name)
-    if not os.path.exists(save_dir):
-        os.makedirs(save_dir)
 
-    mtcnn = MTCNN(keep_all=True, device='cuda' if torch.cuda.is_available() else 'cpu')
-    
+def collect_data():
     cap = cv2.VideoCapture(0)
+
+    face_cascade = cv2.CascadeClassifier(
+        cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+
+    person_id = input("Nhập ID/tên người dùng: ")
+
+    dataset_dir = 'dataset'
+    person_dir = os.path.join(dataset_dir, str(person_id))
+    if not os.path.exists(dataset_dir):
+        os.makedirs(dataset_dir)
+    if not os.path.exists(person_dir):
+        os.makedirs(person_dir)
+
     count = 0
-    
-    while count < num_images:
+    while True:
         ret, frame = cap.read()
         if not ret:
-            print("Failed to capture frame")
             break
-            
-        frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        
-        boxes, _ = mtcnn.detect(frame_rgb)
-        
-        if boxes is not None:
-            for box in boxes:
-                x1, y1, x2, y2 = [int(coord) for coord in box]
-                
-                cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-                
-                face = frame_rgb[y1:y2, x1:x2]
-                if face.size > 0:
-                    face_pil = Image.fromarray(face)
-                    face_pil.save(os.path.join(save_dir, f'{count}.jpg'))
-                    count += 1
-                    print(f'Saved image {count}/{num_images}')
-        
-        cv2.imshow('Collecting Face Data', frame)
-        
-        if cv2.waitKey(1) & 0xFF == ord('q'):
+
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+
+        faces = face_cascade.detectMultiScale(gray, 1.3, 5)
+
+        for (x, y, w, h) in faces:
+            cv2.rectangle(frame, (x, y), (x+w, y+h), (255, 0, 0), 2)
+
+            face_img = frame[y:y+h, x:x+w]
+
+            face_img = cv2.resize(face_img, (160, 160))
+
+            img_path = os.path.join(person_dir, f'{count}.jpg')
+            cv2.imwrite(img_path, face_img)
+            count += 1
+
+        cv2.putText(frame, f'Captured: {count}/100', (10, 30),
+                    cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+
+        cv2.imshow('Collecting Data', frame)
+
+        if cv2.waitKey(1) & 0xFF == ord('q') or count >= 100:
             break
-    
+
     cap.release()
     cv2.destroyAllWindows()
-    print(f"Data collection completed. {count} images saved.")
+    print(f"Đã thu thập xong {count} ảnh cho {person_id}")
 
+
+if __name__ == "__main__":
+    collect_data()

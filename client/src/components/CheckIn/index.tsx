@@ -4,12 +4,13 @@ import Map from '../Map';
 import { Button } from '@nextui-org/react';
 import toast from 'react-hot-toast';
 import { CheckInIcon } from './CheckInIcon';
+import Webcam from 'react-webcam';
+import WebcamRecorder from '../WebcamRecorder';
 
 interface CheckInResponse {
-  status: string;
-  person_id?: string;
-  confidence?: number;
-  detail?: string;
+  message: string;
+  student_id: string;
+  confidence: number;
 }
 
 interface Coordinates {
@@ -19,13 +20,18 @@ interface Coordinates {
 
 const CheckIn: React.FC = () => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const webcamRef = useRef<Webcam>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+
   const [location, setLocation] = useState<Coordinates | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  // const [recordedChunks, setRecordedChunks] = useState<Blob[]>([]);
+  const [response, setResponse] = useState<CheckInResponse | null>(null);
 
   const allowedLocation: Coordinates = {
-    latitude: 11.940419,
-    longitude: 108.458313,
+    latitude: 16.031967,
+    longitude: 108.221274,
   };
 
   const calculateDistance = (coords1: Coordinates, coords2: Coordinates): number => {
@@ -58,68 +64,6 @@ const CheckIn: React.FC = () => {
     });
   };
 
-  const captureFrame = async (): Promise<void> => {
-    if (!videoRef.current) return;
-
-    setLoading(true);
-    setError(null);
-
-    try {
-      const currentLocation = await getCurrentLocation();
-      const distance = calculateDistance(currentLocation, allowedLocation);
-
-      if (distance > 1) {
-        toast.error('Your current location is too far.');
-        setError('Your current location is too far.');
-        setLoading(false);
-        return;
-      }
-
-      // Create a canvas with the same dimensions as the video
-      const canvas = document.createElement('canvas');
-      const video = videoRef.current;
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-
-      const context = canvas.getContext('2d');
-      if (!context) {
-        throw new Error('Failed to get canvas context');
-      }
-
-      // Draw the current frame from the video
-      context.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-      // Convert to blob with high quality
-      const imageBlob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', 1.0));
-
-      if (!imageBlob) {
-        throw new Error('Failed to create image blob');
-      }
-
-      const formData = new FormData();
-      formData.append('file', imageBlob, 'frame.jpg');
-
-      const response = await axios.post<CheckInResponse>('http://localhost:8000/checkin', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
-
-      if (response.data.status === 'error') {
-        toast.error(response.data.detail || 'Check-in failed');
-        setError(response.data.detail || 'Check-in failed');
-      } else {
-        toast.success(`Successfully! Welcome, ${response.data.person_id}`);
-      }
-    } catch (error) {
-      console.error('Error during check-in: ', error);
-      setError('Failed to check-in. Please try again.');
-      toast.error('Failed to check-in. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
     getCurrentLocation()
       .then((coords) => {
@@ -148,15 +92,95 @@ const CheckIn: React.FC = () => {
     startVideo();
   }, []);
 
+  const handleCaptureAndUpload = async () => {
+    try {
+      if (!webcamRef.current || !webcamRef.current.stream) {
+        toast.error('Camera access is required');
+        return;
+      }
+
+      // Check location first
+      const currentLocation = await getCurrentLocation();
+      const distance = calculateDistance(currentLocation, allowedLocation);
+
+      if (distance > 1) {
+        toast.error('You are too far from the check-in location');
+        return;
+      }
+
+      setLoading(true);
+      toast.loading('Recording video...');
+
+      // Start recording
+      mediaRecorderRef.current = new MediaRecorder(webcamRef.current.stream, {
+        mimeType: 'video/webm',
+      });
+
+      const chunks: Blob[] = [];
+
+      mediaRecorderRef.current.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          chunks.push(event.data);
+        }
+      };
+
+      return new Promise((resolve, reject) => {
+        mediaRecorderRef.current!.onstop = async () => {
+          try {
+            if (chunks.length === 0) {
+              throw new Error('No video data recorded');
+            }
+
+            const videoBlob = new Blob(chunks, { type: 'video/webm' });
+            const formData = new FormData();
+            formData.append('file', videoBlob, 'video.webm');
+
+            toast.loading('Processing video...');
+
+            const response = await axios.post<CheckInResponse>('http://127.0.0.1:8000/predict_video/', formData, {
+              headers: {
+                'Content-Type': 'multipart/form-data',
+              },
+            });
+
+            if (response.data) {
+              toast.success(`Welcome ${response.data.student_id}!`);
+              console.log(`Welcome ${response.data.student_id}!`);
+              setResponse(response.data);
+            } else {
+              toast.error('No face detected in video');
+            }
+
+            resolve(response);
+          } catch (error: any) {
+            toast.error(error.message || 'An error occurred during check-in');
+            reject(error);
+          } finally {
+            setLoading(false);
+            toast.dismiss();
+          }
+        };
+
+        // Start recording for 5 seconds
+        mediaRecorderRef.current!.start();
+        setTimeout(() => {
+          mediaRecorderRef.current?.stop();
+        }, 1000);
+      });
+    } catch (error: any) {
+      toast.error(error.message || 'An error occurred');
+      setLoading(false);
+      console.error('Check-in error:', error);
+    }
+  };
+
   return (
     <div className="flex flex-col items-center justify-center min-h-screen p-4">
       <h1 className="text-3xl font-bold mb-6 text-blue-600 uppercase">Welcome to</h1>
       <div className="relative flex gap-4 rounded-lg">
-        <video
-          ref={videoRef}
-          width="480"
-          height="480"
-          className="border ring-2 ring-blue-600/60 ring-offset-2 rounded-lg shadow-lg transform -scale-x-100"
+        <WebcamRecorder
+          webcamRef={webcamRef}
+          className="w-[480px] h-[360px] border ring-2 ring-blue-600/60 ring-offset-2 rounded-lg shadow-lg transform -scale-x-100"
         />
         <Suspense>
           <Map latitude={location?.latitude ?? 0} longitude={location?.longitude ?? 0} />
@@ -164,7 +188,7 @@ const CheckIn: React.FC = () => {
       </div>
       <div className="mt-6 space-x-4">
         <Button
-          onClick={captureFrame}
+          onClick={handleCaptureAndUpload}
           variant="solid"
           color="primary"
           isLoading={loading}
@@ -174,6 +198,12 @@ const CheckIn: React.FC = () => {
         </Button>
       </div>
       {error && <p className="mt-4 text-red-600">{error}</p>}
+      {response && (
+        <div className="mt-6 bg-white shadow-md rounded-lg p-6 w-96">
+          <h2 className="text-lg font-bold mb-2 text-gray-800">Response:</h2>
+          <pre className="text-sm text-gray-700 bg-gray-100 p-4 rounded-lg">{JSON.stringify(response, null, 2)}</pre>
+        </div>
+      )}
     </div>
   );
 };

@@ -1,6 +1,6 @@
 'use client';
 
-import { Spinner, Table, TableBody, TableCell, TableColumn, TableHeader, TableRow } from '@nextui-org/react';
+import { Spinner } from '@nextui-org/react';
 import { useEffect, useState } from 'react';
 
 type CheckinHistory = {
@@ -31,36 +31,43 @@ const CheckinTable = () => {
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center">
+      <div className="flex justify-center items-center h-screen">
         <Spinner size="lg" />
       </div>
     );
   }
 
   return (
-    <div className="max-w-4xl mx-auto my-6">
-      <Table aria-label="Check-in History" css={{ height: 'auto', minWidth: '100%' }}>
-        <TableHeader>
-          <TableColumn>ID</TableColumn>
-          <TableColumn>Họ và tên</TableColumn>
-          {Object.keys(checkinHistory[0]?.checkins || {}).map((key) => (
-            <TableColumn key={key}>{key}</TableColumn>
-          ))}
-        </TableHeader>
-        <TableBody>
-          {checkinHistory?.map((student, index) => (
-            <TableRow key={index}>
-              <TableCell className="text-black">{student.id}</TableCell>
-              <TableCell className="text-black">{student.name}</TableCell>
-              {Object.values(student?.checkins || {}).map((value, idx) => (
-                <TableCell key={idx} className="text-black">
-                  {value || '-'}
-                </TableCell>
+    <div className="max-w-6xl mx-auto my-8 p-4 bg-white shadow-lg rounded-lg">
+      <h1 className="text-2xl font-bold text-blue-600 mb-6 text-center">Check-in History</h1>
+      <div className="overflow-x-auto">
+        <table className="table-auto w-full border-collapse border border-blue-200">
+          <thead>
+            <tr className="bg-blue-600 text-white">
+              <th className="px-4 py-2 border border-blue-200">ID</th>
+              <th className="px-4 py-2 border border-blue-200">Họ và tên</th>
+              {Object.keys(checkinHistory[0]?.checkins || {}).map((key) => (
+                <th key={key} className="px-4 py-2 border border-blue-200">
+                  {key}
+                </th>
               ))}
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+            </tr>
+          </thead>
+          <tbody>
+            {checkinHistory.map((student, index) => (
+              <tr key={index} className={`hover:bg-blue-50 ${index % 2 === 0 ? 'bg-blue-100' : 'bg-white'}`}>
+                <td className="px-4 py-2 border border-blue-200 text-center text-blue-900">{student.id}</td>
+                <td className="px-4 py-2 border border-blue-200 text-center text-blue-900">{student.name}</td>
+                {Object.values(student?.checkins || {}).map((value, idx) => (
+                  <td key={idx} className="px-4 py-2 border border-blue-200 text-center text-blue-900">
+                    {value || '-'}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 };

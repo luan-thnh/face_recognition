@@ -30,8 +30,8 @@ const CheckIn: React.FC = () => {
   const [response, setResponse] = useState<CheckInResponse | null>(null);
 
   const allowedLocation: Coordinates = {
-    latitude: 16.031967,
-    longitude: 108.221274,
+    latitude: 16.054407,
+    longitude: 108.202167,
   };
 
   const calculateDistance = (coords1: Coordinates, coords2: Coordinates): number => {
